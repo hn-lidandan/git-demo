@@ -1,49 +1,45 @@
 use anyhow::{Context, Result};
 use rustls::{Certificate, PrivateKey, ServerConfig};
-use rustls_pemfile::{certs, pkcs8_private_keys};
+use rustls_pemfile::{certs, Item, read_one};  // 使用 read_one 函数
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use log::{info};
-use rustls_pemfile::{ ec_private_keys};
 
 pub fn load_rustls_config(
     cert_path: impl AsRef<Path>,
     key_path: impl AsRef<Path>,
 ) -> Result<ServerConfig> {
     info!("进入证书加载");
+    
     // 加载证书链
-    let cert_file = File::open(cert_path).context("Failed to open certificate file")?;
+    let cert_file = File::open(cert_path).context("打开证书文件失败")?;
     let mut cert_reader = BufReader::new(cert_file);
     let cert_chain = certs(&mut cert_reader)?
         .into_iter()
         .map(Certificate)
         .collect();
     
-    // 加载私钥
-    let key_file = File::open(key_path).context("Failed to open private key file")?;
+    // 加载私钥 - 使用 read_one 函数
+    let key_file = File::open(key_path).context("打开私钥文件失败")?;
     info!("加载私钥");
-    // let mut key_reader = BufReader::new(key_file);
-    // let key = match pkcs8_private_keys(&mut key_reader)?.into_iter().next() {
-    //     Some(key) => PrivateKey(key),
-    //     None => anyhow::bail!("No private key found"),
-    // };
-    info!("加载ECC私钥");
     let mut key_reader = BufReader::new(key_file);
-    let keys = ec_private_keys(&mut key_reader)?;
     
-    if keys.is_empty() {
-        anyhow::bail!("No ECC private keys found");
-    }
+    // 使用 read_one 自动检测格式
+    let key = match read_one(&mut key_reader)? {
+        Some(Item::PKCS8Key(key)) => PrivateKey(key),
+        Some(Item::RSAKey(key)) => PrivateKey(key),
+        Some(Item::ECKey(key)) => PrivateKey(key),
+        _ => anyhow::bail!("无法识别的私钥格式"),
+    };
     
-    let key = PrivateKey(keys[0].clone());
     info!("创建TLS配置");
     // 创建TLS配置
     let config = ServerConfig::builder()
         .with_safe_defaults()
         .with_no_client_auth()
         .with_single_cert(cert_chain, key)
-        .context("Failed to create TLS configuration")?;
+        .context("创建TLS配置失败")?;
 
     Ok(config)
 }
