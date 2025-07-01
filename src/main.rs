@@ -35,7 +35,9 @@ async fn main() -> std::io::Result<()> {
     // .await
 
     // 加载TLS配置
-    let tls_config = load_rustls_config("certs/cert.pem", "certs/key.pem").map_err(|e| {
+    let tls_config = load_rustls_config(
+        "/etc/letsencrypt/live/gitdemo.duckdns.org/fullchain.pem", 
+        "/etc/letsencrypt/live/gitdemo.duckdns.org/privkey.pem").map_err(|e| {
         log::error!("Failed to load TLS config: {}", e);
         std::io::Error::new(std::io::ErrorKind::Other, "TLS config error")
     })?;
@@ -51,11 +53,11 @@ async fn main() -> std::io::Result<()> {
 
     // 同时启动HTTP和HTTPS服务器
     let http_server = HttpServer::new(app_factory.clone())
-        .bind(("0.0.0.0", 8080))?
+        .bind(("0.0.0.0", 80))?
         .run();
 
     let https_server = HttpServer::new(app_factory)
-        .bind_rustls(("0.0.0.0", 8443), tls_config)?
+        .bind_rustls(("0.0.0.0", 443), tls_config)?
         .run();
 
     // 同时运行两个服务器

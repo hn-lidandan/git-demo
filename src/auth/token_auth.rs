@@ -5,7 +5,6 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use futures::future::{LocalBoxFuture, Ready, ready};
 use log::{info, warn};
 use secrecy::{ExposeSecret, Secret};
-use actix_web::http::{header, Uri};
 pub struct TokenAuthMiddleware;
 
 impl<S> Transform<S, ServiceRequest> for TokenAuthMiddleware
