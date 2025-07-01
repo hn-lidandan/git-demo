@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use log::{info};
+use rustls_pemfile::{ ec_private_keys};
 
 pub fn load_rustls_config(
     cert_path: impl AsRef<Path>,
@@ -22,11 +23,20 @@ pub fn load_rustls_config(
     // 加载私钥
     let key_file = File::open(key_path).context("Failed to open private key file")?;
     info!("加载私钥");
+    // let mut key_reader = BufReader::new(key_file);
+    // let key = match pkcs8_private_keys(&mut key_reader)?.into_iter().next() {
+    //     Some(key) => PrivateKey(key),
+    //     None => anyhow::bail!("No private key found"),
+    // };
+    info!("加载ECC私钥");
     let mut key_reader = BufReader::new(key_file);
-    let key = match pkcs8_private_keys(&mut key_reader)?.into_iter().next() {
-        Some(key) => PrivateKey(key),
-        None => anyhow::bail!("No private key found"),
-    };
+    let keys = ec_private_keys(&mut key_reader)?;
+    
+    if keys.is_empty() {
+        anyhow::bail!("No ECC private keys found");
+    }
+    
+    let key = PrivateKey(keys[0].clone());
     info!("创建TLS配置");
     // 创建TLS配置
     let config = ServerConfig::builder()
