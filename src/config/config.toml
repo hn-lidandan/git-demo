@@ -1,0 +1,6 @@
+[repo_config]
+user.name =""
+user.email=""
+core.autocrlf=false
+init.defaultBranch="master"
+# 经典模式的个人访问令牌

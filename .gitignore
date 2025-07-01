@@ -1,0 +1,5 @@
+/target/
+/.env
+/certs/
+/bare_repos/
+/test_repos/

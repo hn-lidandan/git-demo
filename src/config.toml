@@ -1,0 +1,38 @@
+[database_config]
+port = 5432
+host = "117.72.103.91"
+username = "postgres"
+password = "123456"
+dbname = "postgres"
+max_connections = 10
+min_connections = 5
+
+[log_config]
+# 日志展示的路径
+path = "./log/web.log"
+# 高于或者等于 info 的日志就会被记录下来
+level = "info"
+# 日志文件的大小
+size = 10
+ # 日志输出的位置，文件和控制台
+out_kind = ["file", "console"]
+# 最多保留 5 个日志文件
+roll_count = 5
+# 日志时间戳的格式, 表示小时:分钟:秒.微秒
+time_format = "%Y-%m-%d %H:%M:%S.%f"
+
+[web_config]
+host = "0.0.0.0"
+port = 8080
+
+[swagger_config]
+url = "/swagger-ui/{_:.*}"
+doc_url = "/api-docs/openapi.json"
+
+[mqtt_config]
+url= "mqtt://117.72.103.91"  # 117.72.103.91
+port= 1883
+client_id="task_manger"
+service_type="GateWay"
+service_name="task_manger"
+service_addr="0.0.0.0:8080"
