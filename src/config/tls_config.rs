@@ -1,57 +1,52 @@
-use actix_web::dev::{Service, Transform, ServiceRequest, ServiceResponse};
-use actix_web::Error;
-use futures::future::{ok, Ready};
-use log::info;
+use anyhow::{Context, Result};
+use rustls::{Certificate, PrivateKey, ServerConfig};
+use rustls_pemfile::{Item, read_one};
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
+use log::{info};
 
-pub struct SimpleLogger;
 
-impl<S, B> Transform<S, ServiceRequest> for SimpleLogger
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<B>;
-    type Error = Error;
-    type Transform = SimpleLoggerMiddleware<S>;
-    type InitError = ();
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
-
-    fn new_transform(&self, service: S) -> Self::Future {
-        ok(SimpleLoggerMiddleware { service })
+pub fn load_rustls_config(
+    cert_path: impl AsRef<Path>,
+    key_path: impl AsRef<Path>,
+) -> Result<ServerConfig> {
+    info!("进入证书加载");
+    
+    // 加载证书链
+    let cert_file = File::open(cert_path).context("打开证书文件失败")?;
+    let mut cert_reader = BufReader::new(cert_file);
+    let mut cert_chain = vec![];
+    
+    // 确保加载完整证书链
+    while let Ok(Some(item)) = rustls_pemfile::read_one(&mut cert_reader) {
+        if let Item::X509Certificate(cert) = item {
+            cert_chain.push(Certificate(cert));
+        }
     }
-}
+    
+    // 加载私钥
+    let key_file = File::open(key_path).context("打开私钥文件失败")?;
+    info!("加载私钥");
+    let mut key_reader = BufReader::new(key_file);
+    
+    let key = match read_one(&mut key_reader)? {
+        Some(Item::PKCS8Key(key)) => PrivateKey(key),
+        Some(Item::RSAKey(key)) => PrivateKey(key),
+        Some(Item::ECKey(key)) => PrivateKey(key),
+        _ => anyhow::bail!("无法识别的私钥格式"),
+    };
+    
+    info!("创建TLS配置");
+    // 创建TLS配置 - 使用兼容模式
+    let config = ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth()
+        .with_single_cert(cert_chain, key)
+        .context("创建TLS配置失败")?;
 
-pub struct SimpleLoggerMiddleware<S> {
-    service: S,
-}
-
-impl<S, B> Service<ServiceRequest> for SimpleLoggerMiddleware<S>
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<B>;
-    type Error = Error;
-    type Future = futures::future::LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
-        self.service.poll_ready(cx)
-    }
-
-    fn call(&self, req: ServiceRequest) -> Self::Future {
-        let path = req.path().to_string();
-        let method = req.method().to_string();
-
-        info!("请求: {} {}", method, path);
-
-        let fut = self.service.call(req);
-
-        Box::pin(async move {
-            let res = fut.await?;
-            info!("响应: {}", res.status());
-            Ok(res)
-        })
-    }
+    // 不设置 ALPN，让客户端选择
+    info!("不设置ALPN协议，使用客户端协商");
+    
+    Ok(config)
 }
