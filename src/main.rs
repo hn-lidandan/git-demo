@@ -24,8 +24,8 @@ async fn main() -> std::io::Result<()> {
 
     // 加载TLS配置
     let tls_config = load_rustls_config(
-        "/etc/letsencrypt/live/git-demo.duckdns.org/fullchain.pem", 
-        "/etc/letsencrypt/live/git-demo.duckdns.org/privkey.pem"
+        "/etc/letsencrypt/live/git-demo.dy-sec.com/fullchain.pem", 
+        "/etc/letsencrypt/live/git-demo.dy-sec.com/privkey.pem"
     ).map_err(|e| {
         log::error!("Failed to load TLS config: {}", e);
         std::io::Error::new(std::io::ErrorKind::Other, "TLS config error")
