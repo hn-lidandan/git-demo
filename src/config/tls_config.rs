@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use log::{info};
+use rustls::version::TLS12;
 
 pub fn load_rustls_config(
     cert_path: impl AsRef<Path>,
@@ -35,8 +36,11 @@ pub fn load_rustls_config(
     
     info!("创建TLS配置");
     // 创建TLS配置
+    // 创建TLS配置 - 强制使用HTTP/1.1
     let mut config = ServerConfig::builder()
-        .with_safe_defaults()
+        .with_cipher_suites(&rustls::ALL_CIPHER_SUITES) // 手动设置密码套件
+        .with_kx_groups(&rustls::ALL_KX_GROUPS) // 手动设置密钥交换组
+        .with_protocol_versions(&[&TLS12])? // 强制使用 TLS 1.2
         .with_no_client_auth()
         .with_single_cert(cert_chain, key)
         .context("创建TLS配置失败")?;
