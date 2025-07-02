@@ -35,11 +35,15 @@ pub fn load_rustls_config(
     
     info!("创建TLS配置");
     // 创建TLS配置
-    let config = ServerConfig::builder()
+    let mut config = ServerConfig::builder()
         .with_safe_defaults()
         .with_no_client_auth()
         .with_single_cert(cert_chain, key)
         .context("创建TLS配置失败")?;
+
+    // 关键修复：禁用HTTP/2，强制使用HTTP/1.1
+    config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    info!("已设置ALPN协议为HTTP/1.1");
 
     Ok(config)
 }
