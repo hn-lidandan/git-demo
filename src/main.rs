@@ -1,60 +1,39 @@
-mod auth;
-mod config;
-mod controller;
-mod repo;
-mod service;
-pub mod logger;
-use crate::config::tls_config::load_rustls_config;
-// use crate::logger::SimpleLogger;
-use repo::barerepo_manager::RepoManager;
-use std::sync::Arc;
-use actix_web::web;
-use actix_web::{App, HttpServer};
+// minimal_server.rs
+use actix_web::{get, App, HttpResponse, HttpServer, Responder};
+use rustls::{ServerConfig, Certificate, PrivateKey};
+use rustls_pemfile::{certs, pkcs8_private_keys};
+use std::io::BufReader;
+use std::fs::File;
+
+#[get("/")]
+async fn hello() -> impl Responder {
+    HttpResponse::Ok().body("Hello World!")
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // 加载环境变量
-    dotenv::dotenv().ok();
-    env_logger::Builder::from_default_env()
-        .filter_level(log::LevelFilter::Debug)
-        .init();
-    
-    // 初始化仓库管理器
-    let repo_manager = Arc::new(RepoManager::new("bare_repos"));
-
     // 加载TLS配置
-    let tls_config = load_rustls_config(
-        "/etc/letsencrypt/live/git-demo.duckdns.org/fullchain.pem", 
-        "/etc/letsencrypt/live/git-demo.duckdns.org/privkey.pem"
-    ).map_err(|e| {
-        log::error!("Failed to load TLS config: {}", e);
-        std::io::Error::new(std::io::ErrorKind::Other, "TLS config error")
-    })?;
+    let cert_file = File::open("/etc/letsencrypt/live/git-demo.duckdns.org/fullchain.pem").unwrap();
+    let key_file = File::open("/etc/letsencrypt/live/git-demo.duckdns.org/privkey.pem").unwrap();
 
-    // 创建App工厂
-    let app_factory = move || {
-        App::new()
-           .wrap(logger::SimpleLogger) 
-            .wrap(auth::token_auth::TokenAuthMiddleware)
-            .app_data(web::Data::new(repo_manager.clone()))
-            .route("/", web::get().to(|| async { "Git Server Running" }))
-            .configure(controller::git_controller::path_config)
-    };
+    let cert_chain = certs(&mut BufReader::new(cert_file))
+        .unwrap()
+        .into_iter()
+        .map(Certificate)
+        .collect();
+    
+    let mut keys = pkcs8_private_keys(&mut BufReader::new(key_file)).unwrap();
+    let key = PrivateKey(keys.remove(0));
 
-    // 启动HTTP服务器
-    let http_server = HttpServer::new(app_factory.clone())
-        .bind(("0.0.0.0", 80))?
-        .run();
+    let config = ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth()
+        .with_single_cert(cert_chain, key)
+        .unwrap();
 
-    // 启动HTTPS服务器并强制使用HTTP/1.1
-    let https_server = HttpServer::new(app_factory)
-        .bind_rustls(("0.0.0.0", 443), tls_config)?
-        .client_disconnect_timeout(std::time::Duration::from_secs(10))
-        // .http1() // 强制使用HTTP/1.1
-        .run();
-
-    // 同时运行两个服务器（使用显式类型注解） 
-    tokio::try_join!(http_server, https_server)?;
-    // https_server.await?;
-    Ok(())
+    // 启动最小化服务
+    HttpServer::new(|| App::new().service(hello))
+        .bind_rustls("0.0.0.0:8443", config)?
+        .run()
+        .await
 }
