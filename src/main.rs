@@ -3,7 +3,9 @@ mod config;
 mod controller;
 mod repo;
 mod service;
+pub mod logger;
 use crate::config::tls_config::load_rustls_config;
+// use crate::logger::SimpleLogger;
 use repo::barerepo_manager::RepoManager;
 use std::sync::Arc;
 use actix_web::web;
@@ -32,6 +34,7 @@ async fn main() -> std::io::Result<()> {
     // 创建App工厂
     let app_factory = move || {
         App::new()
+           .wrap(logger::SimpleLogger) 
             .wrap(auth::token_auth::TokenAuthMiddleware)
             .app_data(web::Data::new(repo_manager.clone()))
             .route("/", web::get().to(|| async { "Git Server Running" }))
