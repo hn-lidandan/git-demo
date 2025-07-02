@@ -33,7 +33,7 @@ async fn main() -> std::io::Result<()> {
 
     // 启动最小化服务
     HttpServer::new(|| App::new().service(hello))
-        .bind_rustls("0.0.0.0:8443", config)?
+        .bind_rustls("0.0.0.0:443", config)?
         .run()
         .await
 }
