@@ -39,9 +39,9 @@ async fn main() -> std::io::Result<()> {
     };
 
     // 启动HTTP服务器
-    // let http_server = HttpServer::new(app_factory.clone())
-    //     .bind(("0.0.0.0", 80))?
-    //     .run();
+    let http_server = HttpServer::new(app_factory.clone())
+        .bind(("0.0.0.0", 80))?
+        .run();
 
     // 启动HTTPS服务器并强制使用HTTP/1.1
     let https_server = HttpServer::new(app_factory)
@@ -51,7 +51,7 @@ async fn main() -> std::io::Result<()> {
         .run();
 
     // 同时运行两个服务器（使用显式类型注解） 
-    // tokio::try_join!(http_server, https_server)?;
-    https_server.await?;
+    tokio::try_join!(http_server, https_server)?;
+    // https_server.await?;
     Ok(())
 }
